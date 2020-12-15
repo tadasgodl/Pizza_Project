@@ -63,15 +63,13 @@ const forms = {
         init: function () {
             if (this.getElement()) {
                 this.getElement().addEventListener('submit', this.onSubmitListener);
-            }
-        },
-        getElement: function () {
-            let form =  document.getElementById(selectors.forms.create);
-            if (!form) {
-                console.log('Create form was not found');
+                return true;
             }
 
-            return form;
+            return false;
+        },
+        getElement: function () {
+            return document.getElementById(selectors.forms.create);
         },
         onSubmitListener: function (e) {
             e.preventDefault();
@@ -96,23 +94,19 @@ const forms = {
      */
     update: {
         init: function () {
-            console.log('Initializing update form...');
             if (this.elements.form()) {
                 this.elements.form().addEventListener('submit', this.onSubmitListener);
 
                 const closeBtn = forms.update.elements.modal().querySelector('.close');
                 closeBtn.addEventListener('click', forms.update.onCloseListener);
+                return true;
             }
+
+            return false;
         },
         elements: {
             form: function () {
-                let form = document.getElementById(selectors.forms.update);
-
-                if (!form) {
-                    console.log('Update form was not found, check selector: ' + selectors.forms.update);
-                }
-
-                return form;
+                return document.getElementById(selectors.forms.update);
             },
             modal: function () {
                 let modal = document.getElementById(selectors.modal);
@@ -161,6 +155,7 @@ const forms = {
             // Function has to exist
             // since we're calling init() for
             // all elements withing forms object
+            return true;
         },
         /**
          * Fills form fields with data
@@ -170,7 +165,7 @@ const forms = {
          * @param {Object} data
          */
         fill: function (form, data) {
-            console.log(data);
+            console.log('Filling form fields with:', data);
             form.setAttribute('data-id', data.id);
 
             Object.keys(data).forEach(data_id => {
@@ -178,12 +173,14 @@ const forms = {
                     const input = form.querySelector('input[name="' + data_id + '"]');
                     if (input) {
                         input.value = data[data_id];
+                    } else {
+                        console.log('Could not fill field ' + data_id + 'because it wasn`t found in form');
                     }
                 }
             });
         },
         clear: function (form) {
-            var fields = form.querySelectorAll('[name]')
+            let fields = form.querySelectorAll('[name]')
             fields.forEach(field => {
                 field.value = '';
             });
@@ -247,20 +244,21 @@ const forms = {
  */
 const grid = {
     getElement: function () {
-        let element = document.getElementById(selectors.grid);
-
-        if (!element) {
-            throw new Error('Error - Could not find grid in HTML. Check selector: ' + selectors.grid)
-        }
-
-        return element;
+        return document.getElementById(selectors.grid);
     },
     init: function () {
-        this.data.load();
+        if (this.getElement()) {
+            this.data.load();
 
-        Object.keys(this.buttons).forEach(buttonId => {
-            grid.buttons[buttonId].init();
-        });
+            Object.keys(this.buttons).forEach(buttonId => {
+                let success = grid.buttons[buttonId].init();
+                console.log('Setting up button listeners "' + buttonId + '": ' + (success ? 'PASS' : 'FAIL'));
+            });
+
+            return true;
+        }
+
+        return false;
     },
     /**
      * Data-Related functionality
@@ -271,6 +269,7 @@ const grid = {
          * @returns {undefined}
          */
         load: function () {
+            console.log('Grid: Calling API to get data...');
             api(endpoints.get, null, this.success, this.fail);
         },
         success: function (data) {
@@ -296,7 +295,7 @@ const grid = {
             const item = document.createElement('div');
 
             if (data.id == null) {
-                throw Error('There is no "ID" field in API response. Check controller!');
+                throw Error('JS can`t build the item, because API data doesn`t contain its ID. Check API controller!');
             }
 
             item.setAttribute('data-id', data.id);
@@ -336,6 +335,7 @@ const grid = {
          * @param {Object} data
          */
         append: function (data) {
+            console.log('Grid: Creating item in grid container from ', data);
             grid.getElement().append(this.build(data));
         },
         /**
@@ -358,23 +358,27 @@ const grid = {
             item.remove();
         }
     },
+    // Buttons are declared on whole grid, not on each item individually, so
+    // onClickListeners dont duplicate
     buttons: {
         delete: {
             init: function () {
                 if (grid.getElement()) {
                     grid.getElement().addEventListener('click', this.onClickListener);
+                    return true;
                 }
-            },
-            getElements: function () {
-                return document.querySelectorAll('.delete-btn');
+
+                return false;
             },
             onClickListener: function (e) {
-                // Listener is set on whole item, so we listen for which class button
+                // Listener is set on whole grid, so we listen for which class button
                 // has been pressed
                 if (e.target.className === 'delete') {
                     let formData = new FormData();
 
+                    // Find container of the button, which has ID
                     let item = e.target.closest('.data-item');
+                    console.log('Delete button clicked on', item);
 
                     formData.append('id', item.getAttribute('data-id'));
                     api(endpoints.delete, formData, grid.buttons.delete.success, grid.buttons.delete.fail);
@@ -389,17 +393,19 @@ const grid = {
         },
         edit: {
             init: function () {
-                console.log("Initializing edit button...");
-                grid.getElement().addEventListener('click', this.onClickListener);
-            },
-            getElements: function () {
-                return document.querySelectorAll('.edit-btn');
+                if (grid.getElement()) {
+                    grid.getElement().addEventListener('click', this.onClickListener);
+                    return true;
+                }
+
+                return false;
             },
             onClickListener: function (e) {
                 if (e.target.className === 'edit') {
                     let formData = new FormData();
 
                     let item = e.target.closest('.data-item');
+                    console.log('Edit button clicked on', item);
 
                     formData.append('id', item.getAttribute('data-id'));
                     api(endpoints.edit, formData, grid.buttons.edit.success, grid.buttons.edit.fail);
@@ -423,10 +429,13 @@ const app = {
     init: function () {
         // Initialize all forms
         Object.keys(forms).forEach(formId => {
-            forms[formId].init();
+            let success = forms[formId].init();
+            console.log('Initializing form "' + formId + '": ' + (success ? 'SUCCESS' : 'FAIL'));
         });
 
-        grid.init();
+        console.log('Initializing grid...');
+        let success = grid.init();
+        console.log('Grid: Initialization: ' + (success ? 'PASS' : 'FAIL'));
     }
 };
 
